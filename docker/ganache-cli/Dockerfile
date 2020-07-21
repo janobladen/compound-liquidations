@@ -1,0 +1,1 @@
+FROM trufflesuite/ganache-cli

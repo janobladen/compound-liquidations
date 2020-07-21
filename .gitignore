@@ -1,0 +1,5 @@
+/.mnemonic-ganache
+/.mnemonic-rinkeby
+/test.env
+/.idea
+/node_modules
