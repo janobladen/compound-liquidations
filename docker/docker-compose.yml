@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  mariadb:
+    env_file:
+      - "../test.env"
+    build: "./mariadb"
+    ports:
+      - 14601:3306
+  phpmyadmin:
+    env_file:
+      - "../test.env"
+    build: "./phpmyadmin"
+    ports:
+      - 14602:80
+    links:
+      - "mariadb:db"
+  ganache-cli:
+    env_file:
+      - "../test.env"
+    build: "./ganache-cli"
+    ports:
+      - 14603:8545
