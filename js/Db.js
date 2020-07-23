@@ -1,35 +1,23 @@
 const mysql2 = require('mysql2/promise');
 
-module.exports = Db;
+class Db {
 
-Db.prototype.constructor = Db;
+    constructor(config) {
+        let connectionPool = null;
 
-function Db(config) {
+        this.connect = async function() {
+            if (!connectionPool) {
+                connectionPool = await mysql2.createPool(config);
+            }
+            return connectionPool.getConnection();
+        }
 
-    this.config = config;
-    this.connectionPool = null;
+        this.disconnect = async function(conn) {
+            return conn.release();
+        }
 
-}
-
-Db.prototype.connect = async function () {
-    if (!this.connectionPool) {
-        this.connectionPool = await mysql2.createPool(this.config);
     }
-    return this.connectionPool.getConnection();
+
 }
 
-Db.prototype.disconnect = function() {
-    if (this.connectionPool) this.connectionPool.end();
-    this.connectionPool = null;
-}
-
-Db.prototype.getCurrentState = async function () {
-    let conn = await this.connect();
-    let [rows] = await conn.query('SELECT * FROM current_state');
-    let state = {};
-    rows.forEach(function (row) {
-        state[row.state_key] = JSON.parse(row.state_value);
-    });
-    conn.release();
-    return state;
-}
+module.exports = Db;
