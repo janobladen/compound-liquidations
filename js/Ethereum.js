@@ -6,7 +6,7 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 
 class Ethereum extends EventEmitter {
 
-    constructor(config) {
+    constructor(config, state) {
         super();
 
         const networkName = config.networkName;
@@ -17,19 +17,30 @@ class Ethereum extends EventEmitter {
             let ganacheUri = config.uri || 'http://127.0.0.1:8545';
             web3 = new Web3(ganacheUri);
         } else {
-            if (!config.mnemonic) throw new Error('config.mnemonic not defined.');
             if (!config.uri) throw new Error('config.uri not defined.');
-            web3 = new Web3(new HDWalletProvider(config.mnemonic, config.uri));
+            if (config.privateKey) {
+                let provider = new HDWalletProvider(config.privateKey, config.uri);
+                web3 = new Web3(provider);
+            } else {
+                web3 = new Web3(new Web3.providers.WebsocketProvider(config.uri));
+            }
+        }
+
+        let isInitialized = false;
+        async function init() {
+            if (isInitialized) return;
+            isInitialized = true;
+            await web3.eth.getAccounts();
         }
 
         // Subscribe to new block headers and emit 'block' events.
-        web3.eth.subscribe('newBlockHeaders')
-            .on('data', _.bind(function (blockData) {
-                this.emit('block', blockData);
-            }, this));
+        web3.eth.subscribe('newBlockHeaders').on('data', _.bind(function (blockData) {
+            this.emit('block', blockData);
+        }, this));
 
         // Methods
-        this.getWeb3 = function () {
+        this.getWeb3 = async function () {
+            init();
             return web3;
         }
 
@@ -38,7 +49,13 @@ class Ethereum extends EventEmitter {
         }
 
         this.getBlockNumber = async function () {
+            await init();
             return web3.eth.getBlockNumber();
+        }
+
+        this.getAccounts = async function() {
+            await init();
+            return web3.eth.getAccounts();
         }
 
 

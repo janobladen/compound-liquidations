@@ -1,5 +1,5 @@
 {
-  "comptroller": "0x2eaa9d77ae4d8f9cdd9faacd44016e746485bddb",
-  "cDAI": "0x6d7f0754ffeb405d23c51ce938289d4835be3b14",
-  "cETH": "0xd6801a1dffcd0a410336ef88def4320d6df1883e"
+  "Comptroller": "0x2eaa9d77ae4d8f9cdd9faacd44016e746485bddb",
+  "CDAI": "0x6d7f0754ffeb405d23c51ce938289d4835be3b14",
+  "CETH": "0xd6801a1dffcd0a410336ef88def4320d6df1883e"
 }
