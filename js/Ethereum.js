@@ -40,7 +40,7 @@ class Ethereum extends EventEmitter {
 
         // Methods
         this.getWeb3 = async function () {
-            init();
+            await init();
             return web3;
         }
 
