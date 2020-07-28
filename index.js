@@ -35,7 +35,7 @@ const config = {
 const state = {};
 state.ethereum = new Ethereum(config.ethereum, state);
 state.compound = new Compound(config.compound, state);
-state.priceOracle = new PriceOracle(config.priceOracle);
+state.priceOracle = new PriceOracle(config.priceOracle, state);
 
 console.log(chalk.green('Running on mainnet.'));
 
@@ -147,9 +147,6 @@ program.command('liquidate <address>')
             padding: [0, 0, 1, 0]
         });
 
-        const comptroller = await state.compound.getContract('Comptroller');
-        const adminAccount = await (state.ethereum.getAccounts())[0];
-
         let balanceSheet = await state.compound.getBalanceSheetForAccount(borrowerAddress);
         ui.div({
             text: "Collateral: ",
@@ -160,7 +157,7 @@ program.command('liquidate <address>')
             text: _.reduce(_.keys(balanceSheet.collaterals), function (memo, symbol) {
                 memo = memo + symbol
                 memo += ": ";
-                memo += ("" + Compound.parseNumber(balanceSheet.collaterals[symbol] / 1e18, 4));
+                memo += "" + state.compound.formatBN(state.compound.getUnderlying(symbol), balanceSheet.collaterals[symbol]);
                 memo += " ";
                 return memo;
             }, ""),
@@ -178,7 +175,7 @@ program.command('liquidate <address>')
             text: _.reduce(_.keys(balanceSheet.borrows), function (memo, symbol) {
                 memo = memo + symbol
                 memo += ": ";
-                memo += ("" + Compound.parseNumber(balanceSheet.borrows[symbol] / 1e18, 4));
+                memo += "" + state.compound.formatBN(state.compound.getUnderlying(symbol), balanceSheet.borrows[symbol]);
                 memo += " ";
                 return memo;
             }, ""),
@@ -188,17 +185,21 @@ program.command('liquidate <address>')
             border: false
         });
 
-        const web3 = await state.ethereum.getWeb3();
-
         let bestBorrow = await state.compound.highestAssetOf(balanceSheet.borrows);
         ui.div({
-            text: 'Best borrowed asset: ' + bestBorrow.symbol + " (Value: " + Compound.parseNumber(web3.utils.fromWei(bestBorrow.valueInEth, 'ether'), 4) + " ETH)",
+            text: 'Best borrowed asset: '
+                + bestBorrow.symbol
+                + " (Value: " + state.compound.formatBN("ETH", bestBorrow.valueInEth)
+                + " ETH)",
             padding: [1, 0, 0, 1],
             width: 40
         });
         let bestCollateral = await state.compound.highestAssetOf(balanceSheet.collaterals);
         ui.div({
-            text: 'Best collateral asset: ' + bestCollateral.symbol + " (Value: " + Compound.parseNumber(web3.utils.fromWei(bestCollateral.valueInEth, 'ether'), 4) + " ETH)",
+            text: 'Best collateral asset: ' + bestCollateral.symbol
+                + " (Value: "
+                + state.compound.formatBN("ETH", bestCollateral.valueInEth)
+                + " ETH)",
             padding: [0, 0, 0, 1],
             width: 40
         });
@@ -236,11 +237,7 @@ program.command('liquidate <address>')
                 padding: [0, 0, 0, 2]
             });
             closeAmountInEth = rewardAmountInEth;
-            let conversionRate = await state.priceOracle.getPriceInEth(closeUnderlyingSymbol);
-            conversionRate = Math.round(conversionRate * 10e6);
-            let conversionRateScaled = new BN("" + conversionRate);
-            let scale = new BN("" + 10e6);
-            closeAmount = rewardAmountInEth.div(conversionRateScaled).mul(scale);
+            closeAmount = await state.compound.convertEthToUnderlying(closeAmountInEth, closeUnderlyingSymbol);
         } else {
             // Not enough reward for entire liquidation, adjust rewardAmount accordingly.
             ui.div({
@@ -248,17 +245,13 @@ program.command('liquidate <address>')
                 padding: [0, 0, 0, 2]
             });
             rewardAmountInEth = closeAmountInEth;
-            let conversionRate = await state.priceOracle.getPriceInEth(rewardUnderlyingSymbol);
-            conversionRate = Math.round(conversionRate * 10e6);
-            let conversionRateScaled = new BN("" + conversionRate);
-            let scale = new BN("" + 10e6);
-            rewardAmount = closeAmountInEth.div(conversionRateScaled).mul(scale);
+            rewardAmount = await state.compound.convertEthToUnderlying(rewardAmountInEth, rewardUnderlyingSymbol);
         }
 
-        let closeAmountFormatted = await state.compound.formatBN(closeUnderlyingSymbol, closeAmount);
-        let closeAmountInEthFormatted = await state.compound.formatBN('ETH', closeAmountInEth);
-        let rewardAmountFormatted = await state.compound.formatBN(rewardUnderlyingSymbol, rewardAmount);
-        let rewardAmountInEthFormatted = await state.compound.formatBN('ETH', rewardAmountInEth);
+        let closeAmountFormatted = state.compound.formatBN(closeUnderlyingSymbol, closeAmount);
+        let closeAmountInEthFormatted = state.compound.formatBN('ETH', closeAmountInEth);
+        let rewardAmountFormatted = state.compound.formatBN(rewardUnderlyingSymbol, rewardAmount);
+        let rewardAmountInEthFormatted = state.compound.formatBN('ETH', rewardAmountInEth);
         ui.div({
             text: "=> Max. amount for liquidation: "
                 + closeAmountFormatted + " " + closeUnderlyingSymbol
@@ -276,12 +269,12 @@ program.command('liquidate <address>')
         });
 
         let incentiveMatissa = await state.compound.getLiquidationIncentive();
-        let incentiveFactor = await state.compound.formatBN('ETH', incentiveMatissa);
+        let incentiveFactor = state.compound.formatBN('ETH', incentiveMatissa);
         incentiveFactor = Math.round((incentiveFactor - 1) * 100);
         let incentiveAmount = rewardAmount.mul(incentiveMatissa).div(scale);
-        let incentiveAmountFormatted = await state.compound.formatBN(rewardUnderlyingSymbol, incentiveAmount);
+        let incentiveAmountFormatted = state.compound.formatBN(rewardUnderlyingSymbol, incentiveAmount);
         let incentiveAmountInEth = rewardAmountInEth.mul(incentiveMatissa).div(scale);
-        let incentiveAmountInEthFormatted = await state.compound.formatBN('ETH', incentiveAmountInEth);
+        let incentiveAmountInEthFormatted = state.compound.formatBN('ETH', incentiveAmountInEth);
         ui.div({
             text: "=> Adding incentive " + incentiveFactor + "%: "
                 + incentiveAmountFormatted + " " + rewardUnderlyingSymbol
@@ -291,10 +284,10 @@ program.command('liquidate <address>')
         });
 
         let gain = incentiveAmount.sub(rewardAmount);
-        let gainFormatted = await state.compound.formatBN(rewardUnderlyingSymbol, gain);
+        let gainFormatted = state.compound.formatBN(rewardUnderlyingSymbol, gain);
 
         let gainInEth = incentiveAmountInEth.sub(rewardAmountInEth);
-        let gainInEthFormatted = await state.compound.formatBN('ETH', gainInEth);
+        let gainInEthFormatted = state.compound.formatBN('ETH', gainInEth);
         ui.div({
             text: "=> " + chalk.underline("Expected gain: " + gainInEthFormatted + " ETH"
             + " (from " + gainFormatted + " " + rewardUnderlyingSymbol + ")"),

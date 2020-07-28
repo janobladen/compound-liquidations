@@ -6,7 +6,7 @@ const superagent = require('superagent');
 
 const symbols = ['cBAT', 'cDAI', 'cETH', 'cREP', 'cSAI', 'cUSDC', 'cUSDT', 'cWBTC', 'cZRX'];
 const contractNames = _.union(symbols,
-    ["Comptroller"],
+    ["Comptroller", "PriceOracle"],
     _.map(symbols, function (symbol) {
         return symbol.substr(1)
     }));
@@ -116,33 +116,45 @@ class Compound {
             return symbol.substr(1);
         }
 
-        this.getContractDecimals = async function(contractName) {
-            if (contractName === 'ETH') return 18;
+        this.getContractDecimals = function (contractName) {
             if (!decimals[contractName]) {
                 switch (contractName) {
+                    case 'cBAT':
+                    case 'cDAI':
+                    case 'cETH':
+                    case 'cREP':
+                    case 'cSAI':
+                    case 'cUSDC':
+                    case 'cUSDT':
+                    case 'cWBTC':
+                    case 'cZRX':
+                        decimals[contractName] = 8;
+                        break;
+                    case 'BAT':
+                    case 'ETH':
+                    case 'DAI':
+                    case 'REP':
+                    case 'SAI':
+                    case 'ZRX':
+                        decimals[contractName] = 18;
+                        break;
                     case 'USDC':
+                    case 'USDT':
                         decimals[contractName] = 6;
                         break;
+                    case 'WBTC':
+                        decimals[contractName] = 8;
+                        break;
                     default:
-                        let contract = await this.getContract(contractName);
-                        decimals[contractName] = await contract.methods.decimals().call();
+                        throw new Error('Unknown contract ' + contractName);
                 }
             }
             return decimals[contractName];
         }
 
-        this.formatBN = async function(contractName, bn, precision) {
-            if (!precision) precision = 4;
-            let contractDecimals = await this.getContractDecimals(contractName);
-            let numberStr = bn.toString();
-            while (numberStr.length < contractDecimals) numberStr = "0" + numberStr;
-            let fraction = numberStr.slice(-contractDecimals);
-            fraction = fraction.substr(0, precision);
-            let whole = "0";
-            if (numberStr.length > contractDecimals) {
-                whole = numberStr.substr(0,numberStr.length-contractDecimals);
-            }
-            return whole + "." + fraction;
+        this.formatBN = function (contractName, bn, precision) {
+            let contractDecimals = this.getContractDecimals(contractName);
+            return Compound.formatBN(bn, contractDecimals, precision);
         }
 
         this.getBalanceSheetForAccount = async function (accountAddress) {
@@ -176,14 +188,14 @@ class Compound {
         };
 
         this.highestAssetOf = async function (symbolValuePairs) {
-            let valuesinEth = await Promise.map(_.keys(symbolValuePairs), async function (symbol) {
+            let _this = this;
+            let valuesInEth = await Promise.map(_.keys(symbolValuePairs), async function (symbol) {
+                const underlyingAmount = symbolValuePairs[symbol];
                 const underlyingSymbol = symbol.substr(1);
-                let ethPrice = Math.floor((await state.priceOracle.getPriceInEth(underlyingSymbol)) * 10e6);
-                ethPrice = new BN(ethPrice + "");
-                let ethValue = symbolValuePairs[symbol].mul(ethPrice).div(new BN("" + 10e6));
-                return [symbol, ethValue];
+                const ethAmount = await _this.convertUnderlyingToEth(underlyingAmount, underlyingSymbol);
+                return [symbol, ethAmount];
             });
-            let highestValue = _.reduce(valuesinEth, function (memo, value) {
+            let highestValue = _.reduce(valuesInEth, function (memo, value) {
                 if (memo[1].gt(value[1])) return memo;
                 return value;
             }, ['', new BN(0)]);
@@ -193,14 +205,40 @@ class Compound {
             };
         };
 
-        this.getCloseFactor = async function() {
+        this.getCloseFactor = async function () {
             const comptroller = await this.getComptroller();
             return new BN(await comptroller.methods.closeFactorMantissa().call());
         }
 
-        this.getLiquidationIncentive = async function() {
+        this.getLiquidationIncentive = async function () {
             const comptroller = await this.getComptroller();
             return new BN(await comptroller.methods.liquidationIncentiveMantissa().call());
+        }
+
+        this.convertEthToUnderlying = async function(amountInEth, underlyingSymbol) {
+            let scale = new BN(""+1e6);
+            let ethScale = new BN(""+1e18);
+            let ethAmount = amountInEth.mul(scale).div(ethScale);
+            ethAmount = Number(ethAmount.toString()) / 1e6;
+            let underlyingAmount = await state.priceOracle.convertFromEth(ethAmount, underlyingSymbol);
+            underlyingAmount = Math.floor(underlyingAmount * 1e6);
+            underlyingAmount = new BN(""+underlyingAmount);
+            let underlyingScale = new BN("10").pow(new BN(""+ state.compound.getContractDecimals(underlyingSymbol)));
+            underlyingAmount = underlyingAmount.mul(underlyingScale).div(new BN(""+1e6));
+            return underlyingAmount;
+        }
+
+        this.convertUnderlyingToEth = async function(amountInUnderlying, underlyingSymbol) {
+            let scale = new BN(""+1e6);
+            let underlyingScale = new BN("10").pow(new BN(""+ state.compound.getContractDecimals(underlyingSymbol)));
+            let underlyingAmount = amountInUnderlying.mul(scale).div(underlyingScale);
+            underlyingAmount = Number(underlyingAmount.toString()) / 1e6;
+            let ethAmount = await state.priceOracle.convertToEth(underlyingAmount, underlyingSymbol);
+            ethAmount = Math.floor(ethAmount*1e6);
+            ethAmount = new BN(""+ethAmount);
+            let ethScale = new BN(""+1e18);
+            ethAmount = ethAmount.mul(ethScale).div(new BN(""+1e6));
+            return ethAmount;
         }
     }
 
@@ -213,5 +251,19 @@ Compound.parseNumber = function (str, decimals) {
     fraction = fraction || "0";
     return Number.parseFloat(whole + "." + fraction.substr(0, decimals));
 }
+
+Compound.formatBN = function (bn, decimals, precision) {
+    if (!precision) precision = 4;
+    let numberStr = bn.toString();
+    while (numberStr.length < decimals) numberStr = "0" + numberStr;
+    let fraction = numberStr.slice(-decimals);
+    fraction = fraction.substr(0, precision);
+    let whole = "0";
+    if (numberStr.length > decimals) {
+        whole = numberStr.substr(0, numberStr.length - decimals);
+    }
+    return whole + "." + fraction;
+}
+
 
 module.exports = Compound;
