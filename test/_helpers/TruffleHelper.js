@@ -1,12 +1,16 @@
 const _ = require('underscore');
 const execa = require('execa');
 const Promise = require('bluebird');
+const URI = require('uri-js');
+
+const TestConfig = require("./TestConfig.js");
 
 const _readdir = Promise.promisify(require('fs').readdir);
 const _stat = Promise.promisify(require('fs').stat);
 
 let isCompiled = false;
 let lastCompileResult = null;
+let isGanacheRunning = false;
 
 const TruffleHelper = {
 
@@ -32,7 +36,7 @@ const TruffleHelper = {
         if (mustCompile) lastCompileResult = await execa.command('./node_modules/.bin/truffle compile');
         isCompiled = true;
         return lastCompileResult
-    }
+    },
 
 };
 

@@ -15,40 +15,56 @@ const decimals = {};
 class Compound {
 
     constructor(config, state) {
-        let markets = config.markets.split(",");
         let contracts = null;
 
-        this.listAccounts = async function ({borrowerAccounts, maxHealth, minWorthInEth}) {
+        this._fetchAccountService = async function ({borrowerAccounts, minWorthInEth}) {
+            let networkName = state.ethereum.getNetworkName();
             const requestData = {
-                "network": state.ethereum.getNetworkName(),
-                page_number: 1, page_size: 1000
+                "network": networkName === 'ganache' ? 'mainnet' : networkName,
+                page_number: 1, page_size: 1000,
+                block_number: config.accountServiceBlock ? config.accountServiceBlock : 0
             };
 
-            if (maxHealth) requestData.max_health = {value: "" + maxHealth};
+            requestData.max_health = {value: "1.0"};
             if (minWorthInEth) requestData.min_borrow_value_in_eth = {value: "" + minWorthInEth};
             if (borrowerAccounts && borrowerAccounts.length) requestData.addresses = borrowerAccounts;
 
             let accounts = [];
-            while (true) {
-                let result = await superagent.post(config.accountService)
-                    .set('Content-Type', 'application/json')
-                    .set('Accept', 'application/json')
-                    .send(requestData);
+            let error;
+            while (!error) {
+                let result;
+                try {
+                    result = await superagent.get(config.accountService)
+                        .set('Accept', 'application/json')
+                        .query(requestData);
+                } catch (e) {
+                    throw new Error("Error calling from compound API: " + e);
+                }
                 if (!result.body.error) {
                     accounts = accounts.concat(result.body.accounts);
                     let {total_pages} = result.body.pagination_summary;
                     if (accounts.length === 0 || requestData.page_number === total_pages) break;
                     requestData.page_number++;
                 } else {
-                    throw new Error(result.body.error);
+                    error = result.body.error;
+                    throw new Error("Error return from compound API: " + error);
                 }
             }
-            accounts = _.filter(accounts, function (account) {
-                return _.reduce(account.tokens, function (memo, token) {
-                    if (memo === true) return true;
-                    return _.contains(markets, token.symbol.toUpperCase())
-                }, false);
-            });
+            return accounts;
+        };
+
+        this.listAccounts = async function ({borrowerAccounts, minWorthInEth, maxResults}) {
+            let accounts = await this._fetchAccountService({borrowerAccounts, minWorthInEth});
+            accounts = _.chain(accounts)
+                .map(account => {
+                    return {
+                        address: account.address,
+                        borrowValue: Compound.parseNumber(account.total_borrow_value_in_eth.value, 4)
+                    }
+                })
+                .sortBy(account => -account.borrowValue)
+                .first(maxResults ? maxResults : 10)
+                .value();
             return accounts;
         }
 
@@ -215,29 +231,29 @@ class Compound {
             return new BN(await comptroller.methods.liquidationIncentiveMantissa().call());
         }
 
-        this.convertEthToUnderlying = async function(amountInEth, underlyingSymbol) {
-            let scale = new BN(""+1e6);
-            let ethScale = new BN(""+1e18);
+        this.convertEthToUnderlying = async function (amountInEth, underlyingSymbol) {
+            let scale = new BN("" + 1e6);
+            let ethScale = new BN("" + 1e18);
             let ethAmount = amountInEth.mul(scale).div(ethScale);
             ethAmount = Number(ethAmount.toString()) / 1e6;
             let underlyingAmount = await state.priceOracle.convertFromEth(ethAmount, underlyingSymbol);
             underlyingAmount = Math.floor(underlyingAmount * 1e6);
-            underlyingAmount = new BN(""+underlyingAmount);
-            let underlyingScale = new BN("10").pow(new BN(""+ state.compound.getContractDecimals(underlyingSymbol)));
-            underlyingAmount = underlyingAmount.mul(underlyingScale).div(new BN(""+1e6));
+            underlyingAmount = new BN("" + underlyingAmount);
+            let underlyingScale = new BN("10").pow(new BN("" + state.compound.getContractDecimals(underlyingSymbol)));
+            underlyingAmount = underlyingAmount.mul(underlyingScale).div(new BN("" + 1e6));
             return underlyingAmount;
         }
 
-        this.convertUnderlyingToEth = async function(amountInUnderlying, underlyingSymbol) {
-            let scale = new BN(""+1e6);
-            let underlyingScale = new BN("10").pow(new BN(""+ state.compound.getContractDecimals(underlyingSymbol)));
+        this.convertUnderlyingToEth = async function (amountInUnderlying, underlyingSymbol) {
+            let scale = new BN("" + 1e6);
+            let underlyingScale = new BN("10").pow(new BN("" + state.compound.getContractDecimals(underlyingSymbol)));
             let underlyingAmount = amountInUnderlying.mul(scale).div(underlyingScale);
             underlyingAmount = Number(underlyingAmount.toString()) / 1e6;
             let ethAmount = await state.priceOracle.convertToEth(underlyingAmount, underlyingSymbol);
-            ethAmount = Math.floor(ethAmount*1e6);
-            ethAmount = new BN(""+ethAmount);
-            let ethScale = new BN(""+1e18);
-            ethAmount = ethAmount.mul(ethScale).div(new BN(""+1e6));
+            ethAmount = Math.floor(ethAmount * 1e6);
+            ethAmount = new BN("" + ethAmount);
+            let ethScale = new BN("" + 1e18);
+            ethAmount = ethAmount.mul(ethScale).div(new BN("" + 1e6));
             return ethAmount;
         }
     }

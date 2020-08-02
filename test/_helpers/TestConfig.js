@@ -11,14 +11,19 @@ module.exports = {
         password: process.env.MYSQL_PASSWORD,
     },
     ethereum: {
-        networkName: 'ganache',
+        networkName: 'mainnet',
         uri: process.env.ETH_GANACHE_URI,
         gasLimit: process.env.ETH_GANACHE_GAS_LIMIT,
         gasPrice: process.env.ETH_GANACHE_GAS_PRICE
     },
     compound: {
         accountService: process.env.COMPOUND_HTTP_ACCOUNT_SERVICE,
-        markets: process.env.COMPOUND_MARKETS
+        accountServiceBlock: process.env.COMPOUND_HTTP_ACCOUNT_SERVICE_BLOCK
+    },
+    ganache: {
+        uri: process.env.ETH_GANACHE_URI,
+        forkUri: process.env.ETH_GANACHE_FORK_URI,
+        mnemonic: process.env.ETH_GANACHE_MNEMONIC
     }
 
 };

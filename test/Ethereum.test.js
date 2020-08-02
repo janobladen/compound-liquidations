@@ -1,6 +1,7 @@
 const Promise = require('bluebird');
 const assert = require('chai').assert;
 const TestState = require('./_helpers/TestState');
+const TruffleHelper = require('./_helpers/TruffleHelper');
 
 describe('Ethereum.js', function () {
 
@@ -23,7 +24,7 @@ describe('Ethereum.js', function () {
                 resolve();
             });
         });
-        let web3 = ethereum.getWeb3();
+        let web3 = await ethereum.getWeb3();
         let accounts = await web3.eth.getAccounts();
         web3.eth.sendTransaction({
             from: accounts[0],

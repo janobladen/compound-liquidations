@@ -6,7 +6,6 @@ const _ = require('underscore');
 const BN = require('bn.js');
 const chalk = require('chalk');
 const cliui = require('cliui');
-const Promise = require('bluebird');
 
 const Ethereum = require('./js/Ethereum');
 const Compound = require('./js/Compound');
@@ -23,11 +22,10 @@ const config = {
         privateKey: process.env.ETH_MAINNET_PRIVATE_KEY
     },
     compound: {
-        accountService: process.env.COMPOUND_HTTP_ACCOUNT_SERVICE,
-        markets: process.env.COMPOUND_MARKETS
+        accountService: process.env.COMPOUND_HTTP_ACCOUNT_SERVICE
     },
-    priceOracle: {
-        uri: process.env.PRICE_ORACLE_URI
+    gasOracle: {
+        uri: process.env.GAS_ORACLE_URI
     }
 
 };

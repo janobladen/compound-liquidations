@@ -43,37 +43,6 @@ MockCompound.get = async function () {
     return instance;
 }
 
-async function _deployContracts(ethereum) {
-    await TruffleHelper.compile();
-    const web3 = ethereum.getWeb3();
-    const contractNames = ['CETH', 'CDAI'];
-    const accounts = await web3.eth.getAccounts();
-    const adminAccount = accounts[0];
-
-    const addresses = {};
-    const deploys = _.map(contractNames, function (contractName) {
-        return new Promise(async function (resolve, reject) {
-            const contractJson = await jsonfile.readFile('./sol/build/Mock' + contractName + '.json');
-            const deployContract = new web3.eth.Contract(contractJson.abi);
-            deployContract.deploy({data: contractJson.bytecode})
-                .send({
-                    from: adminAccount,
-                    gasPrice: TestConfig.ethereum.gasPrice,
-                    gas: TestConfig.ethereum.gasLimit
-                })
-                .on('error', function (error) {
-                    reject(new Error('Unable to deploy contract ' + contractName + ": " + error));
-                }).on('receipt', function (receipt) {
-                resolve([contractName, receipt.contractAddress]);
-            });
-        });
-    });
-    let results = await Promise.all(deploys);
-    results = _.object(results);
-    await jsonfile.writeFile("./resources/compound/addresses.ganache.json", results);
-    return results;
-}
-
 function _createAPI() {
     let app = express();
     app.use(express.json())
