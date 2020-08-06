@@ -3,9 +3,13 @@ const assert = require('chai').assert;
 const TestState = require('./_helpers/TestState');
 const TruffleHelper = require('./_helpers/TruffleHelper');
 
-describe('Ethereum.js', function () {
+describe.skip('Ethereum.js', function () {
 
     let ethereum = null;
+
+    before('Start ganache CLI', async function() {
+        await TruffleHelper.startGanache();
+    });
 
     before('#constructor()', async function () {
         ethereum = TestState.get().ethereum;
@@ -32,6 +36,10 @@ describe('Ethereum.js', function () {
             value: web3.utils.toWei('0.01', 'ether')
         });
         return p;
+    });
+
+    after("Stop ganache CLI", async function() {
+        TruffleHelper.stopGanache();
     });
 
 });

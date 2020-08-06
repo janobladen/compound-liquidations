@@ -195,9 +195,11 @@ class Compound {
 
             await Promise.all(Promise.map(accountMarketSymbols, _.bind(async function (symbol) {
                 let cTokenContract = await this.getContract(symbol);
-                let amount = new BN(await cTokenContract.methods.borrowBalanceCurrent(accountAddress).call());
+                let amount = await cTokenContract.methods.borrowBalanceCurrent(accountAddress).call();
+                amount = new BN(amount);
                 if (amount.gtn(0)) balanceSheet.borrows[symbol] = amount;
-                amount = new BN(await cTokenContract.methods.balanceOfUnderlying(accountAddress).call());
+                amount = await cTokenContract.methods.balanceOfUnderlying(accountAddress).call();
+                amount = new BN(amount);
                 if (amount.gtn(0)) balanceSheet.collaterals[symbol] = amount;
             }, this)));
             return balanceSheet;

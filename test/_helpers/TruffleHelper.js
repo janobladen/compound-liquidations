@@ -1,4 +1,5 @@
 const _ = require('underscore');
+const {ChildService} = require('child-service');
 const execa = require('execa');
 const Promise = require('bluebird');
 const URI = require('uri-js');
@@ -10,7 +11,7 @@ const _stat = Promise.promisify(require('fs').stat);
 
 let isCompiled = false;
 let lastCompileResult = null;
-let isGanacheRunning = false;
+let ganachCli = false;
 
 const TruffleHelper = {
 
@@ -27,7 +28,7 @@ const TruffleHelper = {
             try {
                 const statDest = await _stat('./sol/build/' + file.replace('.sol', '.json'));
                 return statSrc.mtimeMs > statDest.mtimeMs;
-            } catch(e) {
+            } catch (e) {
                 return true;
             }
         }, false);
@@ -37,6 +38,27 @@ const TruffleHelper = {
         isCompiled = true;
         return lastCompileResult
     },
+
+    startGanache: async function () {
+        if (!ganachCli) {
+            let ganacheUri = URI.parse(TestConfig.ganache.uri);
+            ganachCli = new ChildService({
+                command: "node_modules/.bin/ganache-cli",
+                args: ["-p", ganacheUri.port,
+                    "-m", '"' + TestConfig.ganache.mnemonic + '"',
+                    "-f", '"' + TestConfig.ganache.forkUri + '"',
+                    "-d"],
+                readyRegex: /Listening on/,
+            });
+            await ganachCli.start();
+        }
+        return ganachCli;
+    },
+
+    stopGanache: async function () {
+        if (ganachCli) await ganachCli.stop();
+        ganachCli = null;
+    }
 
 };
 

@@ -2,10 +2,10 @@
 pragma solidity ^0.6.11;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "./CErc20.sol";
+
 
 contract CompoundLiquidationBot is Ownable {
-
-    mapping(string => address) public contractAddresses;
 
     constructor() public {
 
@@ -14,11 +14,12 @@ contract CompoundLiquidationBot is Ownable {
     function liquidateErc20(address borrowerAccount,
         address borrowContract,
         uint amount,
-        address collateralAddress) public
+        CErc20 collateralAddress) public
     {
-
-
-
+        CErc20 cBorrowContract = CErc20(borrowContract);
+        cBorrowContract.approve(address(this), amount);
+        cBorrowContract.liquidateBorrow(borrowerAccount, amount, collateralAddress);
     }
 
 }
+

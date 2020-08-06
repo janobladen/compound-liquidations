@@ -1,3 +1,8 @@
+const HDWalletProvider = require('@truffle/hdwallet-provider');
+const TestConfig = require('./test/_helpers/TestConfig');
+
+const testProvider = new HDWalletProvider(TestConfig.ganache.mnemonic, TestConfig.ganache.uri);
+
 module.exports = {
 
     migrations_directory: "./sol/migrations",
@@ -6,12 +11,12 @@ module.exports = {
 
     networks: {
         development: {
-            host: "127.0.0.1",
-            port: 14603,
+            provider: testProvider,
+/*            host: "127.0.0.1",
+            port: 14603,*/
             network_id: "*",
-            gas: '6721975',
-            gasPrice: '20000000000',
-            websockets: true
+            websockets: true,
+
         },
     },
 
