@@ -16,6 +16,7 @@ class Compound {
 
     constructor(config, state) {
         let contracts = null;
+        let cache = {};
 
         this._fetchAccountService = async function ({borrowerAccounts, minWorthInEth}) {
             let networkName = state.ethereum.getNetworkName();
@@ -223,14 +224,27 @@ class Compound {
             };
         };
 
+
         this.getCloseFactor = async function () {
-            const comptroller = await this.getComptroller();
-            return new BN(await comptroller.methods.closeFactorMantissa().call());
+            if (!_.has(cache, 'closeFactor')) {
+                const comptroller = await this.getComptroller();
+                cache.closeFactor = new BN(await comptroller.methods.closeFactorMantissa().call());
+                setTimeout(function () {
+                    delete cache.closeFactor;
+                }, 600 /* secs */ * 1000);
+            }
+            return cache.closeFactor;
         }
 
         this.getLiquidationIncentive = async function () {
-            const comptroller = await this.getComptroller();
-            return new BN(await comptroller.methods.liquidationIncentiveMantissa().call());
+            if (!_.has(cache.liquidationIncentive)) {
+                const comptroller = await this.getComptroller();
+                cache.liquidationIncentive = new BN(await comptroller.methods.liquidationIncentiveMantissa().call());
+                setTimeout(function() {
+                    delete cache.liquidationIncentive;
+                }, 600 /* secs */ * 1000);
+            }
+            return cache.liquidationIncentive;
         }
 
         this.convertEthToUnderlying = async function (amountInEth, underlyingSymbol) {
@@ -262,7 +276,8 @@ class Compound {
 
 }
 
-Compound.parseNumber = function (str, decimals) {
+Compound
+    .parseNumber = function (str, decimals) {
     if (decimals === null || decimals === undefined) decimals = 9;
     str = str || "0.0";
     let [whole, fraction] = str.toString().split('.');
@@ -270,7 +285,8 @@ Compound.parseNumber = function (str, decimals) {
     return Number.parseFloat(whole + "." + fraction.substr(0, decimals));
 }
 
-Compound.formatBN = function (bn, decimals, precision) {
+Compound
+    .formatBN = function (bn, decimals, precision) {
     if (!precision) precision = 4;
     let numberStr = bn.toString();
     while (numberStr.length < decimals) numberStr = "0" + numberStr;
@@ -284,4 +300,5 @@ Compound.formatBN = function (bn, decimals, precision) {
 }
 
 
-module.exports = Compound;
+module
+    .exports = Compound;

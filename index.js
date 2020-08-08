@@ -4,8 +4,10 @@ const {program} = require('commander');
 
 const _ = require('underscore');
 const BN = require('bn.js');
+const bunyan = require('bunyan');
 const chalk = require('chalk');
 const cliui = require('cliui');
+const Promise = require('bluebird');
 
 const Ethereum = require('./js/Ethereum');
 const Compound = require('./js/Compound');
@@ -34,8 +36,6 @@ const state = {};
 state.ethereum = new Ethereum(config.ethereum, state);
 state.compound = new Compound(config.compound, state);
 state.priceOracle = new PriceOracle(config.priceOracle, state);
-
-console.log(chalk.green('Running on mainnet.'));
 
 program.command('help', {isDefault: true})
     .action(function () {
@@ -134,6 +134,7 @@ program.command('list')
         });
         process.exit(0);
     });
+
 
 program.command('liquidate <address>')
     .description('Liquidates assets for a specific address')
@@ -288,13 +289,103 @@ program.command('liquidate <address>')
         let gainInEthFormatted = state.compound.formatBN('ETH', gainInEth);
         ui.div({
             text: "=> " + chalk.underline("Expected gain: " + gainInEthFormatted + " ETH"
-            + " (from " + gainFormatted + " " + rewardUnderlyingSymbol + ")"),
+                + " (from " + gainFormatted + " " + rewardUnderlyingSymbol + ")"),
             padding: [0, 0, 0, 2],
             width: 40
         });
 
         console.log(ui.toString());
         process.exit(0);
+    });
+
+program.command('scan')
+    .description('Scans for assets to liquidate')
+    .action(async function () {
+        const compound = state.compound;
+        const ethereum = state.ethereum;
+        const logger = bunyan.createLogger({name: 'compound-bot'});
+        let initialBlock = await ethereum.getBlockNumber();
+        let isScanning = false;
+        async function _scan() {
+            if (isScanning) return;
+            isScanning = true;
+            const borrowerAccounts = await compound.listAccounts({maxResults: 10});
+            if (borrowerAccounts.length === 0) {
+                logger.info('No underfall borrower assets found.');
+                return;
+            }
+            logger.info('Found %s accounts for liquidation.', borrowerAccounts.length);
+            await Promise.each(borrowerAccounts, async function (borrowerAccount) {
+                // Get the balance sheet and find the asset with the highest value on both sides.
+                let balanceSheet = await compound.getBalanceSheetForAccount(borrowerAccount.address);
+                let bestBorrow = await compound.highestAssetOf(balanceSheet.borrows);
+                let bestCollateral = await compound.highestAssetOf(balanceSheet.collaterals);
+
+                // Determine available borrow value. Only one asset can be liquidated at a time.
+                // This is even reduced by the current Close Factor.
+                let closeFactor = await compound.getCloseFactor();
+                let closeSymbol = bestBorrow.symbol;
+                let closeAmount = balanceSheet.borrows[closeSymbol];
+                let closeAmountInEth = bestBorrow.valueInEth;
+                let closeUnderlyingSymbol = compound.getUnderlying(closeSymbol);
+                let scale = new BN(Number(1e18).toString());
+                closeAmount = closeAmount.mul(closeFactor).div(scale);
+                closeAmountInEth = closeAmountInEth.mul(closeFactor).div(scale);
+
+                // Determine available reward.
+                let rewardSymbol = bestCollateral.symbol;
+                let rewardAmount = balanceSheet.collaterals[rewardSymbol];
+                let rewardAmountInEth = bestCollateral.valueInEth;
+                let rewardUnderlyingSymbol = compound.getUnderlying(rewardSymbol);
+                scale = new BN(Number(1e18).toString());
+                rewardAmount = rewardAmount.mul(closeFactor).div(scale);
+                rewardAmountInEth = rewardAmountInEth.mul(closeFactor).div(scale);
+
+                // Since we can only swap one single collateral per liquidation, we need to
+                // establish which one of collateral or borrow the reward for
+                // liquidation is based on.
+                if (rewardAmountInEth.lt(closeAmountInEth)) {
+                    closeAmountInEth = rewardAmountInEth;
+                    closeAmount = await compound.convertEthToUnderlying(closeAmountInEth, closeUnderlyingSymbol);
+                } else {
+                    rewardAmountInEth = closeAmountInEth;
+                    rewardAmount = await compound.convertEthToUnderlying(rewardAmountInEth, rewardUnderlyingSymbol);
+                }
+
+                // Calculate the reward based on the current reward mantissa.
+                let incentiveMatissa = await compound.getLiquidationIncentive();
+                let incentiveFactor = compound.formatBN('ETH', incentiveMatissa);
+                incentiveFactor = Math.round((incentiveFactor - 1) * 100);
+                let incentiveAmount = rewardAmount.mul(incentiveMatissa).div(scale);
+                let incentiveAmountFormatted = compound.formatBN(rewardUnderlyingSymbol, incentiveAmount);
+                let incentiveAmountInEth = rewardAmountInEth.mul(incentiveMatissa).div(scale);
+                let incentiveAmountInEthFormatted = compound.formatBN('ETH', incentiveAmountInEth);
+
+                let closeAmountFormatted = compound.formatBN(closeUnderlyingSymbol, closeAmount);
+                let closeAmountInEthFormatted = compound.formatBN('ETH', closeAmountInEth);
+                let rewardAmountFormatted = compound.formatBN(rewardUnderlyingSymbol, rewardAmount);
+                let rewardAmountInEthFormatted = compound.formatBN('ETH', rewardAmountInEth);
+
+                logger.info('Address %s: closing %s %s (%s ETH) for %s %s (%s ETH) with incentive => %s %s (%s ETH)',
+                    borrowerAccount.address,
+                    closeAmountFormatted, closeUnderlyingSymbol,
+                    closeAmountInEthFormatted,
+                    rewardAmountFormatted, rewardUnderlyingSymbol,
+                    rewardAmountInEthFormatted,
+                    incentiveAmountFormatted, rewardUnderlyingSymbol,
+                    incentiveAmountInEthFormatted
+                );
+            });
+            isScanning = false;
+        }
+
+        await _scan();
+        logger.info('Waiting for new blocks on %s, block #%s', ethereum.getNetworkName(), initialBlock);
+        ethereum.on('block', async function (blockData) {
+            logger.info('New block: #%s', blockData.number);
+            await _scan();
+        });
+
     });
 
 program.parse(process.argv);

@@ -20,22 +20,33 @@ class Ethereum extends EventEmitter {
 
         async function init() {
             if (isInitialized) return;
+            isInitialized = true;
             if (config.privateKey) {
-                web3Provider = new HDWalletProvider(config.privateKey, config.uri);
+                const wsProvider = new Web3.providers.WebsocketProvider(config.uri);
+                HDWalletProvider.prototype.on = wsProvider.on.bind(wsProvider);
+                web3Provider = new HDWalletProvider(config.privateKey, wsProvider);
                 web3 = new Web3(web3Provider);
             } else {
                 web3Provider = new Web3.providers.WebsocketProvider(config.uri);
                 web3 = new Web3(web3Provider);
             }
-            web3Provider.on('close', function () {
-                if (web3Provider && web3Provider.end ) web3Provider.end();
+            let onClose = function () {
+                if (web3Provider && web3Provider.end) web3Provider.end();
                 isInitialized = false;
-            });
-            isInitialized = true;
+            };
+            if (web3Provider.on) web3Provider.on('close', onClose);
             // Subscribe to new block headers and emit 'block' events.
-            web3.eth.subscribe('newBlockHeaders').on('data', _.bind(function (blockData) {
-                this.emit('block', blockData);
-            }, this));
+            web3.eth.subscribe('newBlockHeaders')
+                .on('data', _.bind(function (blockData) {
+                    this.emit('block', blockData);
+                }, this))
+                .on('error', _.bind(function (error) {
+                    this.emit('error', error)
+                }, this))
+                .on('connected', _.bind(function(number) {
+                    this.emit('connected', number);
+                }, this));
+
         }
 
 

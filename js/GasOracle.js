@@ -10,7 +10,7 @@ class GasOracle {
         let gasPrices = {};
         let cacheInvalidator = setInterval(_.bind(function () {
             this._clearCache();
-        }, this), 5 /* secs */ * 60000);
+        }, this), 60 /* secs */ * 60000);
 
         this._fetchGasOracle = async function () {
             try {
