@@ -359,12 +359,18 @@ program.command('scan')
                 let incentiveAmount = rewardAmount.mul(incentiveMatissa).div(scale);
                 let incentiveAmountFormatted = compound.formatBN(rewardUnderlyingSymbol, incentiveAmount);
                 let incentiveAmountInEth = rewardAmountInEth.mul(incentiveMatissa).div(scale);
-                let incentiveAmountInEthFormatted = compound.formatBN('ETH', incentiveAmountInEth);
+                let gain = incentiveAmount.sub(rewardAmount);
+                let gainFormatted = state.compound.formatBN(rewardUnderlyingSymbol, gain);
 
+                let gainInEth = incentiveAmountInEth.sub(rewardAmountInEth);
+                let gainInEthFormatted = state.compound.formatBN('ETH', gainInEth);
+                let incentiveAmountInEthFormatted = compound.formatBN('ETH', incentiveAmountInEth);
                 let closeAmountFormatted = compound.formatBN(closeUnderlyingSymbol, closeAmount);
                 let closeAmountInEthFormatted = compound.formatBN('ETH', closeAmountInEth);
                 let rewardAmountFormatted = compound.formatBN(rewardUnderlyingSymbol, rewardAmount);
                 let rewardAmountInEthFormatted = compound.formatBN('ETH', rewardAmountInEth);
+
+
 
                 logger.info('Address %s: closing %s %s (%s ETH) for %s %s (%s ETH) with incentive => %s %s (%s ETH)',
                     borrowerAccount.address,
@@ -372,8 +378,8 @@ program.command('scan')
                     closeAmountInEthFormatted,
                     rewardAmountFormatted, rewardUnderlyingSymbol,
                     rewardAmountInEthFormatted,
-                    incentiveAmountFormatted, rewardUnderlyingSymbol,
-                    incentiveAmountInEthFormatted
+                    gainFormatted, rewardUnderlyingSymbol,
+                    gainInEthFormatted
                 );
             });
             isScanning = false;

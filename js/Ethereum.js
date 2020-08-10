@@ -6,7 +6,7 @@ const HDWalletProvider = require('@truffle/hdwallet-provider');
 
 class Ethereum extends EventEmitter {
 
-    constructor(config, state) {
+    constructor(config) {
         super();
 
         const networkName = config.networkName;
