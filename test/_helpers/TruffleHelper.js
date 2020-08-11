@@ -80,6 +80,7 @@ const TruffleHelper = {
             memo[contractName] = {abi, bytecode};
             return memo;
         }, {});
+        let contracts = {};
         await Promise.all(Promise.map(contractNames, function (contractName) {
             return new Promise(function (resolve, reject) {
                 let contract = new web3.eth.Contract(deployed[contractName].abi);
@@ -93,11 +94,12 @@ const TruffleHelper = {
                         reject(error);
                     })
                     .on('receipt', function(receipt) {
-                        deployed[contractName].address = receipt.contractAddress;
+                        contracts[contractName] = new web3.eth.Contract(deployed[contractName].abi, receipt.contractAddress);
                         resolve(receipt.contractAddress);
                     });
             });
         }));
+        return contracts;
     },
 
     startGanache: async function () {

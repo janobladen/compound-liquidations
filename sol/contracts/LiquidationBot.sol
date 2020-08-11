@@ -23,13 +23,16 @@ contract LiquidationBot is Ownable {
     function drain(address tokenContractAddress) onlyOwner public returns (uint256) {
         Erc20 tokenContract = Erc20(tokenContractAddress);
         address _owner = owner();
-        uint256 _balance = tokenContract.balanceOf(_owner);
-        if (_balance == 0 ) return _balance;
-        tokenContract.transfer(_owner, _balance);
+        uint256 _balance = tokenContract.balanceOf(address(this));
+        if (_balance == 0) return _balance;
+        if (!tokenContract.transfer(_owner, _balance)) {
+            revert('trasnfer() failed.');
+        }
         return _balance;
     }
 
-
+    function fund() external payable onlyOwner {
+    }
 
 }
 

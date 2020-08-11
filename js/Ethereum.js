@@ -53,6 +53,8 @@ class Ethereum extends EventEmitter {
         // Methods
         this.getWeb3 = async function () {
             await init.apply(this);
+            this.fromWei = web3.utils.fromWei;
+            this.toWei = web3.utils.toWei;
             return web3;
         }
 
