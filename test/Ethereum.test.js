@@ -12,7 +12,7 @@ describe('Ethereum.js', function () {
     });
 
     before('#constructor()', async function () {
-        ethereum = TestState.get('forked').ethereum;
+        ethereum = await TestState.get('forked').ethereum;
     });
 
     it('#getBlockNumber()', async function () {
@@ -21,7 +21,7 @@ describe('Ethereum.js', function () {
     });
 
     after("Stop ganache CLI", async function() {
-        TruffleHelper.stopGanache();
+        await TruffleHelper.stopGanache();
     });
 
 });

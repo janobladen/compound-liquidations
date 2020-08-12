@@ -41,7 +41,13 @@ class Ethereum extends EventEmitter {
                     this.emit('block', blockData);
                 }, this))
                 .on('error', _.bind(function (error) {
-                    this.emit('error', error)
+                    if (error && error.code && error.code === 1006) {
+                        web3.eth.clearSubscriptions();
+                        isInitialized = false;
+                        this.emit('close', error);
+                        return;
+                    }
+                    this.emit('error', error);
                 }, this))
                 .on('connected', _.bind(function(number) {
                     this.emit('connected', number);

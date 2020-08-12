@@ -10,6 +10,10 @@ describe('LiquidationBot.sol', function () {
     let compound;
     let contract;
 
+    before('Start ganache CLI', async function() {
+        await TruffleHelper.startGanache();
+    });
+
     before('Create test execution environment.', async function () {
         let state = await TestState.get('forked');
         forkedChain = state.ethereum;
@@ -115,6 +119,10 @@ describe('LiquidationBot.sol', function () {
             return;
         }
         assert.fail('Calling drain() by other account than owner was expected to fail.');
+    });
+
+    after("Stop ganache CLI", async function() {
+        await TruffleHelper.stopGanache();
     });
 
 });
