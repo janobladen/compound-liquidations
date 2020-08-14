@@ -12,11 +12,10 @@ module.exports = {
     networks: {
         development: {
             provider: testProvider,
-/*            host: "127.0.0.1",
-            port: 14603,*/
+            host: "127.0.0.1",
+            port: 14603,
             network_id: "*",
             websockets: true,
-
         },
     },
 

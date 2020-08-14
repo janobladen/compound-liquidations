@@ -306,6 +306,8 @@ program.command('scan')
         const logger = bunyan.createLogger({name: 'compound-bot'});
         let initialBlock = await ethereum.getBlockNumber();
         let isScanning = false;
+        let cache = [];
+
         async function _scan() {
             if (isScanning) return;
             isScanning = true;
@@ -370,17 +372,26 @@ program.command('scan')
                 let rewardAmountFormatted = compound.formatBN(rewardUnderlyingSymbol, rewardAmount);
                 let rewardAmountInEthFormatted = compound.formatBN('ETH', rewardAmountInEth);
 
-
-
-                logger.info('Address %s: closing %s %s (%s ETH) for %s %s (%s ETH) with incentive => %s %s (%s ETH)',
-                    borrowerAccount.address,
-                    closeAmountFormatted, closeUnderlyingSymbol,
-                    closeAmountInEthFormatted,
-                    rewardAmountFormatted, rewardUnderlyingSymbol,
-                    rewardAmountInEthFormatted,
-                    gainFormatted, rewardUnderlyingSymbol,
-                    gainInEthFormatted
-                );
+                if (!_.contains(cache, borrowerAccount.address)) {
+                    cache.push(borrowerAccount.address);
+                    logger.info('Address %s: possible liquidation %s %s (%s ETH) for %s %s (%s ETH) with incentive => %s %s (%s ETH)',
+                        borrowerAccount.address,
+                        closeAmountFormatted, closeUnderlyingSymbol,
+                        closeAmountInEthFormatted,
+                        rewardAmountFormatted, rewardUnderlyingSymbol,
+                        rewardAmountInEthFormatted,
+                        gainFormatted, rewardUnderlyingSymbol,
+                        gainInEthFormatted
+                    );
+                }
+            });
+            cache = _.filter(cache, function(address) {
+                let isCached = _.reduce(borrowerAccounts, function(memo, borrowerAccount) {
+                    if (memo) return true;
+                    if ( borrowerAccount.address === address) return true;
+                    return false;
+                }, false);
+                return isCached;
             });
             isScanning = false;
         }

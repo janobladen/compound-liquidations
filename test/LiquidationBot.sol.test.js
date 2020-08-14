@@ -1,4 +1,5 @@
 const assert = require('chai').assert;
+const {ether} = require('@openzeppelin/test-helpers');
 
 const Compound = require('../js/Compound');
 const TestState = require('./_helpers/TestState');
@@ -9,10 +10,6 @@ describe('LiquidationBot.sol', function () {
     let forkedChain;
     let compound;
     let contract;
-
-    before('Start ganache CLI', async function() {
-        await TruffleHelper.startGanache();
-    });
 
     before('Create test execution environment.', async function () {
         let state = await TestState.get('forked');
@@ -37,10 +34,10 @@ describe('LiquidationBot.sol', function () {
             gas: 400000
         });
         let balance = await DAI.methods.balanceOf(accounts[0]).call();
-        let receipt = await DAI.methods.transfer(contract.options.address, balance).send({
+        await DAI.methods.transfer(contract.options.address, balance).send({
             from: accounts[0]
         });
-        balance = await DAI.methods.balanceOf(contract.options.address).call();
+        await DAI.methods.balanceOf(contract.options.address).call();
     });
 
     it('fund()', async function () {
@@ -84,7 +81,7 @@ describe('LiquidationBot.sol', function () {
                 to: contract.options.address,
                 value: forkedChain.toWei('1', 'ether')
             });
-        } catch(err) {
+        } catch (err) {
             assert.match(err, /revert/);
             return;
         }
@@ -98,12 +95,12 @@ describe('LiquidationBot.sol', function () {
         balance = await DAI.methods.balanceOf(accounts[0]).call();
         assert.equal(balance, 0, 'DAI balance of owner before drain');
         balance = await DAI.methods.balanceOf(contract.options.address).call();
-        assert.equal(balance, 100, 'DAI balance of contract before drain');
+        assert.isAtLeast(balance, 100, 'DAI balance of contract before drain');
         let receipt = await contract.methods.drain(DAI.options.address).send({
             from: accounts[0]
         });
         balance = await DAI.methods.balanceOf(accounts[0]).call();
-        assert.equal(balance, 100, 'DAI balance of owner after drain');
+        assert.isAtLeast(balance, 100, 'DAI balance of owner after drain');
         balance = await DAI.methods.balanceOf(contract.options.address).call();
         assert.equal(balance, 0, 'DAI balance of contract after drain');
     });
@@ -119,10 +116,6 @@ describe('LiquidationBot.sol', function () {
             return;
         }
         assert.fail('Calling drain() by other account than owner was expected to fail.');
-    });
-
-    after("Stop ganache CLI", async function() {
-        await TruffleHelper.stopGanache();
     });
 
 });

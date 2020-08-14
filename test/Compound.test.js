@@ -15,10 +15,6 @@ describe('Compound.js', function () {
     let ethereum;
     let accountServiceStub;
 
-    before('Start ganache CLI', async function () {
-        await TruffleHelper.startGanache();
-    });
-
     before('#constructor()', async function () {
         compound = TestState.get('mainnet').compound;
         ethereum = TestState.get('mainnet').ethereum;
@@ -62,10 +58,6 @@ describe('Compound.js', function () {
 
     after('Remove test stubs.', function () {
         accountServiceStub.restore();
-    });
-
-    after('Stop ganache CLI', async function () {
-        await TruffleHelper.stopGanache();
     });
 
 });

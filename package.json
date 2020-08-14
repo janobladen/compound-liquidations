@@ -23,6 +23,7 @@
     "web3": "^1.2.9"
   },
   "devDependencies": {
+    "@openzeppelin/test-helpers": "^0.5.6",
     "bn.js": "^5.1.2",
     "chai": "^4.2.0",
     "child-service": "^2.4.0",
